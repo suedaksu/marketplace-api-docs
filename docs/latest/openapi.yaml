@@ -1,0 +1,1832 @@
+openapi: 3.0.0
+info:
+  title: Marketplace Integration API
+  description: E-bebek marketplace entegrasyon servisleri için API dokümantasyonu
+  version: 1.0.0
+  contact:
+    name: E-bebek Marketplace Team
+
+servers:
+  - url: https://api.ebebek.com/integration
+    description: Production server
+
+paths:
+  # ==================== ORDERS CONTROLLER ====================
+  
+  /order/sellers/{sellerId}/orders:
+    get:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Sipariş paketlerini listele
+      description: |
+        Satıcıya ait sipariş paketlerini filtreler ve sayfalama ile listeler.
+        Tarih aralığı, durum, sipariş numarası gibi kriterlerle filtreleme yapılabilir.
+      operationId: getShipmentPackages
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+            example: "test-seller-id"
+        - name: startDate
+          in: query
+          description: Başlangıç tarihi (Unix timestamp - milisaniye)
+          schema:
+            type: integer
+            format: int64
+            example: 1638316800000
+        - name: endDate
+          in: query
+          description: Bitiş tarihi (Unix timestamp - milisaniye)
+          schema:
+            type: integer
+            format: int64
+            example: 1640995199000
+        - name: page
+          in: query
+          description: Sayfa numarası (0'dan başlar)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: Sayfa başına kayıt sayısı
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+        - name: orderNumber
+          in: query
+          description: Sipariş numarası
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Sipariş durumu
+          schema:
+            type: string
+            enum: [READY, WAITING, WAITING_PACKAGING, PAYMENT_RECORD_EXPORTED, READY_FOR_PICKUP, PICKUP_COMPLETE, SHIPPED, DELIVERY_COMPLETED, CANCELLED, CANCELLING]
+        - name: orderByField
+          in: query
+          description: Sıralama alanı
+          schema:
+            type: string
+            default: PackageLastModifiedDate
+            enum: [PackageLastModifiedDate, OrderDate]
+        - name: orderByDirection
+          in: query
+          description: Sıralama yönü
+          schema:
+            type: string
+            default: DESC
+            enum: [ASC, DESC]
+        - name: shipmentPackageIds
+          in: query
+          description: Gönderi paket ID'leri listesi
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShipmentPackagesResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /order/sellers/{sellerId}/shipment-packages/{packageId}/update-tracking-number:
+    put:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Kargo takip numarasını güncelle
+      description: |
+        Belirtilen sipariş paketi için kargo takip numarasını günceller.
+        Takip numarası zorunludur.
+      operationId: updateTrackingNumber
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: packageId
+          in: path
+          required: true
+          description: Paket ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTrackingNumberRequest'
+      responses:
+        '200':
+          description: Başarıyla güncellendi
+        '400':
+          description: Bad request - Tracking number is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /order/sellers/{sellerId}/shipment-packages/{packageId}:
+    put:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Sipariş paketini güncelle
+      description: |
+        Sipariş paketinin satır bilgilerini, durumunu ve parametrelerini günceller.
+        Request body zorunludur.
+      operationId: updatePackage
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: packageId
+          in: path
+          required: true
+          description: Paket ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePackageRequest'
+      responses:
+        '200':
+          description: Başarıyla güncellendi
+        '400':
+          description: Bad request - Request body is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /order/sellers/{sellerId}/shipment-packages/{packageId}/cargo-providers:
+    put:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Kargo firmasını değiştir
+      description: |
+        Sipariş paketi için kargo firmasını değiştirir.
+        Kargo firma kodu zorunludur.
+      operationId: changeCargoProvider
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: packageId
+          in: path
+          required: true
+          description: Paket ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCargoProviderRequest'
+      responses:
+        '200':
+          description: Başarıyla güncellendi
+        '400':
+          description: Bad request - Cargo provider is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sellers/{sellerId}/seller-invoice-links:
+    post:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Fatura linki gönder
+      description: |
+        Sipariş paketi için fatura linkini sisteme ekler.
+        shipmentPackageId zorunludur.
+      operationId: sendInvoiceLink
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceDTO'
+      responses:
+        '200':
+          description: Başarıyla eklendi
+        '400':
+          description: Bad request - Shipment package ID is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sellers/{sellerId}/seller-invoice-file:
+    post:
+      tags:
+        - Sipariş Entegrasyonu
+      summary: Fatura dosyası yükle
+      description: |
+        Sipariş paketi için fatura dosyasını yükler.
+        shipmentPackageId ve file parametreleri zorunludur.
+      operationId: uploadInvoiceFile
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: shipmentPackageId
+          in: query
+          required: true
+          description: Gönderi paket ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Fatura dosyası (PDF, JPG, PNG)
+      responses:
+        '200':
+          description: Başarıyla yüklendi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+        '400':
+          description: Bad request - Shipment package ID is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== PRODUCTS CONTROLLER ====================
+
+  /product/brands:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Marka listesini getir
+      description: Sistemdeki tüm markaları sayfalama ile listeler
+      operationId: getBrands
+      parameters:
+        - name: page
+          in: query
+          description: Sayfa numarası (0'dan başlar)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: Sayfa başına kayıt sayısı
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandsResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/brands/by-name:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: İsme göre marka ara
+      description: Marka adına göre arama yapar
+      operationId: getBrandsByName
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Aranacak marka adı
+          schema:
+            type: string
+            example: "baby"
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BrandDTO'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/product-categories:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Kategori ağacını getir
+      description: Tüm ürün kategorilerini hiyerarşik yapıda getirir
+      operationId: getCategoryTree
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /inventory/sellers/{sellerId}/products/price-and-inventory:
+    post:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Fiyat ve stok güncelle
+      description: |
+        Ürünlerin fiyat ve stok bilgilerini toplu olarak günceller.
+        İşlem asenkron olarak gerçekleştirilir ve batchRequestId döner.
+      operationId: updatePriceAndInventory
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePriceAndInventoryRequest'
+      responses:
+        '200':
+          description: İstek başarıyla alındı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRequestResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/sellers/{sellerId}/products:
+    post:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Yeni ürün oluştur
+      description: |
+        Toplu olarak yeni ürünler oluşturur.
+        İşlem asenkron olarak gerçekleştirilir ve batchRequestId döner.
+      operationId: createProducts
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductsRequest'
+      responses:
+        '200':
+          description: İstek başarıyla alındı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRequestResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    put:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Ürünleri güncelle
+      description: |
+        Mevcut ürünleri toplu olarak günceller.
+        İşlem asenkron olarak gerçekleştirilir ve batchRequestId döner.
+      operationId: updateProducts
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductsRequest'
+      responses:
+        '200':
+          description: İstek başarıyla alındı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRequestResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Ürünleri filtrele
+      description: |
+        Ürünleri çeşitli kriterlere göre filtreler ve listeler.
+        Onay durumu, barkod, tarih aralığı, marka gibi filtreler kullanılabilir.
+      operationId: filterProducts
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: approved
+          in: query
+          description: Onay durumu
+          schema:
+            type: boolean
+        - name: barcode
+          in: query
+          description: Barkod numarası
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          description: Başlangıç tarihi (Unix timestamp - milisaniye)
+          schema:
+            type: integer
+            format: int64
+        - name: endDate
+          in: query
+          description: Bitiş tarihi (Unix timestamp - milisaniye)
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          description: Sayfa numarası (0'dan başlar)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: dateQueryType
+          in: query
+          description: Tarih sorgu tipi
+          schema:
+            type: string
+        - name: size
+          in: query
+          description: Sayfa başına kayıt sayısı
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: stockCode
+          in: query
+          description: Stok kodu
+          schema:
+            type: string
+        - name: archived
+          in: query
+          description: Arşivlenmiş mi?
+          schema:
+            type: boolean
+        - name: productMainId
+          in: query
+          description: Varyantlı ürün grup kodu
+          schema:
+            type: string
+        - name: onSale
+          in: query
+          description: Satışta mı?
+          schema:
+            type: boolean
+        - name: rejected
+          in: query
+          description: Reddedilmiş mi?
+          schema:
+            type: boolean
+        - name: brandIds
+          in: query
+          description: Marka ID'leri listesi
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFilterResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/sellers/{sellerId}/products/archive-state:
+    put:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Ürün satış durumunu güncelle
+      description: |
+        Ürünlerin arşiv/satış durumunu toplu olarak günceller.
+        İşlem asenkron olarak gerçekleştirilir ve batchRequestId döner.
+      operationId: updateProductSaleStatus
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchivedProductRequest'
+      responses:
+        '200':
+          description: İstek başarıyla alındı
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRequestResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/sellers/{sellerId}/products/batch-requests/{batchRequestId}:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Toplu işlem sonucunu sorgula
+      description: |
+        Asenkron toplu işlemin durumunu ve sonucunu sorgular.
+        Başarılı/başarısız kayıt sayıları ve detayları döner.
+      operationId: getBatchRequestResult
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+        - name: batchRequestId
+          in: path
+          required: true
+          description: Toplu işlem ID'si
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchRequestResultResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/variantOptions/{optionName}:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Varyant seçeneklerini getir
+      description: |
+        Belirtilen varyant tipi için mevcut değerleri getirir.
+        Örnek: color, size
+      operationId: getVariantOptions
+      parameters:
+        - name: optionName
+          in: path
+          required: true
+          description: Varyant seçenek adı (color, size)
+          schema:
+            type: string
+            example: "color"
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Varyant seçenekleri
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== VENDORS CONTROLLER ====================
+
+  /sellers/{sellerId}/update-logo:
+    post:
+      tags:
+        - Satıcı Entegrasyonu
+      summary: Satıcı logosunu güncelle
+      description: Satıcının logo dosyasını yükler ve günceller
+      operationId: updateVendorLogo
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Logo dosyası (JPG, JPEG, PNG) olmalıdır
+      responses:
+        '200':
+          description: Başarıyla yüklendi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cargo-providers:
+    get:
+      tags:
+        - Satıcı Entegrasyonu
+      summary: Kargo firmalarını listele
+      description: Sistemdeki tüm kargo firmalarını listeler
+      operationId: getCargoProviders
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargoProviderListDTO'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cargo-price-list:
+    get:
+      tags:
+        - Satıcı Entegrasyonu
+      summary: Kargo fiyat listesini indir
+      description: Kargo fiyat listesi şablon dosyasını indirir
+      operationId: getCargoPriceList
+      responses:
+        '200':
+          description: Başarılı yanıt - Dosya indirildi
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Dosya bulunamadı
+        '500':
+          description: Sunucu hatası
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+
+  /cargo-performance-template:
+    get:
+      tags:
+        - Satıcı Entegrasyonu
+      summary: Kargo performans şablonunu indir
+      description: Kargo performans şablon dosyasını indirir
+      operationId: getCargoPerformanceTemplate
+      responses:
+        '200':
+          description: Başarılı yanıt - Dosya indirildi
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Dosya bulunamadı
+        '500':
+          description: Sunucu hatası
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+
+  /sellers/{sellerId}/cargo-priority-order:
+    put:
+      tags:
+        - Satıcı Entegrasyonu
+      summary: Kargo öncelik sırasını güncelle
+      description: |
+        Satıcının kargo firma öncelik sırasını günceller.
+        Büyük ve standart ölçekli teslimat listeleri ayrı ayrı belirtilir. Kargo firmalarını listele servisinden alınan firmaların code değerleri kullanılır.
+      operationId: updateCargoPriorityOrder
+      parameters:
+        - name: sellerId
+          in: path
+          required: true
+          description: Satıcı ID'si
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VendorCargoPriorityUpdateRequest'
+      responses:
+        '200':
+          description: Başarıyla güncellendi
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /product/origins:
+    get:
+      tags:
+        - Ürün Entegrasyonu
+      summary: Menşei listesini getir
+      description: Sistemdeki tüm menşei (origin) ülkelerini sayfalama ile listeler
+      operationId: getOrigins
+      parameters:
+        - name: name
+          in: query
+          description: Aranacak ülke adı (opsiyonel)
+          schema:
+            type: string
+            example: "Türkiye"
+        - name: page
+          in: query
+          description: Sayfa numarası (0'dan başlar)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: Sayfa başına kayıt sayısı
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Başarılı yanıt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginsResponse'
+        '500':
+          description: Sunucu hatası
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    # ==================== ERROR SCHEMA ====================
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Hata mesajı
+          example: "Tracking number is required"
+
+    # ==================== ORDER SCHEMAS ====================
+    UpdateTrackingNumberRequest:
+      type: object
+      required:
+        - trackingNumber
+      properties:
+        trackingNumber:
+          type: string
+          description: Kargo takip numarası (zorunlu)
+          example: "1234567890"
+
+    UpdatePackageRequest:
+      type: object
+      properties:
+        lines:
+          type: array
+          description: Güncellenecek sipariş satırları
+          items:
+            $ref: '#/components/schemas/UpdatePackageLineRequest'
+        params:
+          type: object
+          description: Ek parametreler
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          description: Paket durumu
+          enum: [READY, WAITING, WAITING_PACKAGING, PAYMENT_RECORD_EXPORTED, READY_FOR_PICKUP, PICKUP_COMPLETE, SHIPPED, DELIVERY_COMPLETED, CANCELLED, CANCELLING]
+
+    UpdatePackageLineRequest:
+      type: object
+      properties:
+        lineId:
+          type: string
+          description: Satır ID'si
+        quantity:
+          type: integer
+          description: Miktar
+          minimum: 1
+
+    UpdateCargoProviderRequest:
+      type: object
+      required:
+        - cargoProvider
+      properties:
+        cargoProvider:
+          type: string
+          description: Kargo firma kodu (zorunlu)
+          example: "horoz"
+
+    InvoiceDTO:
+      type: object
+      required:
+        - shipmentPackageId
+      properties:
+        shipmentPackageId:
+          type: string
+          description: Gönderi paket ID'si (zorunlu)
+        invoiceLink:
+          type: string
+          description: Fatura linki
+          format: uri
+        invoiceDateTime:
+          type: integer
+          format: int64
+          description: Fatura tarihi (Unix timestamp - milisaniye)
+        invoiceNumber:
+          type: string
+          description: Fatura numarası
+
+    ShipmentPackagesResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Mevcut sayfa numarası
+          example: 0
+        size:
+          type: integer
+          description: Sayfa başına kayıt sayısı
+          example: 50
+        totalPages:
+          type: integer
+          description: Toplam sayfa sayısı
+          example: 10
+        totalElements:
+          type: integer
+          format: int64
+          description: Toplam kayıt sayısı
+          example: 487
+        content:
+          type: array
+          description: Sipariş paketleri listesi
+          items:
+            $ref: '#/components/schemas/ShipmentPackageDTO'
+
+    ShipmentPackageDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Paket ID'si
+        orderNumber:
+          type: string
+          description: Sipariş numarası
+        orderDate:
+          type: integer
+          format: int64
+          description: Sipariş tarihi (Unix timestamp)
+        shipmentAddress:
+          $ref: '#/components/schemas/AddressDTO'
+        invoiceAddress:
+          $ref: '#/components/schemas/AddressDTO'
+        customerFirstName:
+          type: string
+          description: Müşteri adı
+        customerLastName:
+          type: string
+          description: Müşteri soyadı
+        customerEmail:
+          type: string
+          format: email
+          description: Müşteri e-posta
+        customerId:
+          type: string
+          description: Müşteri ID'si
+        identityNumber:
+          type: string
+          description: Müşteri UID'si
+        grossAmount:
+          type: number
+          format: double
+          description: Brüt tutar
+        totalDiscount:
+          type: number
+          format: double
+          description: Toplam indirim
+        taxNumber:
+          type: string
+          description: Vergi numarası
+        currencyCode:
+          type: string
+          description: Para birimi kodu
+          example: "TRY"
+        totalPrice:
+          type: number
+          format: double
+          description: Toplam fiyat
+        cargoTrackingNumber:
+          type: string
+          description: Kargo takip numarası
+        cargoTrackingLink:
+          type: string
+          description: Kargo takip linki
+        cargoSenderNumber:
+          type: string
+          description: Kargo gönderici numarası
+        cargoProviderName:
+          type: string
+          description: Kargo firma adı
+        lines:
+          type: array
+          description: Sipariş satırları
+          items:
+            $ref: '#/components/schemas/OrderLineDTO'
+        packageHistories:
+          type: array
+          description: Paket geçmişi
+          items:
+            $ref: '#/components/schemas/PackageHistoryDTO'
+        shipmentPackageStatus:
+          type: string
+          description: Gönderi paket durumu
+        status:
+          type: string
+          description: Durum
+        deliveryType:
+          type: string
+          description: Teslimat tipi
+        estimatedDeliveryStartDate:
+          type: integer
+          format: int64
+          description: Tahmini teslimat başlangıç tarihi
+        estimatedDeliveryEndDate:
+          type: integer
+          format: int64
+          description: Tahmini teslimat bitiş tarihi
+        deliveryAddressType:
+          type: string
+          description: Teslimat adres tipi
+        invoiceLink:
+          type: string
+          description: Fatura linki
+        lastModifiedDate:
+          type: integer
+          format: int64
+          description: Son değişiklik tarihi
+        commercial:
+          type: boolean
+          description: Ticari mi?
+        cargoDeci:
+          type: integer
+          description: Kargo desi
+        whoPays:
+          type: integer
+          description: "Kim öder? (1: Satıcı, 2: Alıcı)"
+
+
+    AddressDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Adres ID'si
+        firstName:
+          type: string
+          description: Ad
+        lastName:
+          type: string
+          description: Soyad
+        fullName:
+          type: string
+          description: Tam ad
+        company:
+          type: string
+          description: Şirket adı
+        address1:
+          type: string
+          description: Adres satır 1
+        address2:
+          type: string
+          description: Adres satır 2
+        fullAddress:
+          type: string
+          description: Tam adres
+        city:
+          type: string
+          description: Şehir
+        cityCode:
+          type: string
+          description: Şehir kodu
+        district:
+          type: string
+          description: İlçe
+        districtId:
+          type: string
+          description: İlçe ID'si
+        postalCode:
+          type: string
+          description: Posta kodu
+        countryCode:
+          type: string
+          description: Ülke kodu
+        neighborhood:
+          type: string
+          description: Mahalle
+        neighborhoodId:
+          type: string
+          description: Mahalle ID'si
+        phone:
+          type: string
+          description: Telefon
+        taxOffice:
+          type: string
+          description: Vergi dairesi
+        taxNumber:
+          type: string
+          description: Vergi numarası
+
+    OrderLineDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Satır ID'si
+        quantity:
+          type: integer
+          description: Miktar
+        productSize:
+          type: string
+          description: Ürün bedeni
+        merchantSku:
+          type: string
+          description: Satıcı SKU'su
+        productName:
+          type: string
+          description: Ürün adı
+        productCode:
+          type: string
+          description: Ürün kodu
+        productOrigin:
+          type: string
+          description: Ürün menşei
+        merchantId:
+          type: string
+          description: Satıcı ID'si
+        amount:
+          type: number
+          format: double
+          description: Tutar
+        discount:
+          type: number
+          format: double
+          description: İndirim
+        currencyCode:
+          type: string
+          description: Para birimi kodu
+        productColor:
+          type: string
+          description: Ürün rengi
+        sku:
+          type: string
+          description: SKU
+        barcode:
+          type: string
+          description: Barkod
+        orderLineItemStatusName:
+          type: string
+          description: Sipariş satır durumu
+        price:
+          type: number
+          format: double
+          description: Fiyat
+        productCategoryId:
+          type: string
+          description: Ürün kategori ID'si
+        commission:
+          type: number
+          format: double
+          description: Komisyon
+
+    PackageHistoryDTO:
+      type: object
+      properties:
+        createdDate:
+          type: integer
+          format: int64
+          description: Oluşturulma tarihi
+        status:
+          type: string
+          description: Durum
+
+    # ==================== PRODUCT SCHEMAS ====================
+    BrandsResponse:
+      type: object
+      properties:
+        brands:
+          type: array
+          description: Marka listesi
+          items:
+            $ref: '#/components/schemas/BrandDTO'
+
+    BrandDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Marka ID'si
+        name:
+          type: string
+          description: Marka adı
+
+    CategoryResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          description: Kategori listesi
+          items:
+            $ref: '#/components/schemas/CategoryDTO'
+
+    CategoryDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Kategori ID'si
+        name:
+          type: string
+          description: Kategori adı
+        parentId:
+          type: string
+          description: Üst kategori ID'si
+        subCategories:
+          type: array
+          description: Alt kategoriler
+          items:
+            $ref: '#/components/schemas/CategoryDTO'
+
+    UpdatePriceAndInventoryRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Güncellenecek ürünler listesi
+          items:
+            $ref: '#/components/schemas/StockPriceItemDTO'
+
+    StockPriceItemDTO:
+      type: object
+      required:
+        - barcode
+      properties:
+        barcode:
+          type: string
+          description: Ürün barkodu (zorunlu)
+        quantity:
+          type: integer
+          description: Stok miktarı
+          minimum: 0
+        salePrice:
+          type: number
+          format: double
+          description: Satış fiyatı
+          minimum: 0
+        listPrice:
+          type: number
+          format: double
+          description: Liste fiyatı
+          minimum: 0
+
+    CreateProductsRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Oluşturulacak/güncellenecek ürünler listesi
+          items:
+            $ref: '#/components/schemas/ProductItemDTO'
+
+    ProductItemDTO:
+      type: object
+      required:
+        - barcode
+        - title
+        - brandId
+        - categoryId
+      properties:
+        barcode:
+          type: string
+          description: Barkod (zorunlu)
+        title:
+          type: string
+          description: Ürün başlığı (zorunlu)
+        productMainId:
+          type: string
+          description: Varyantlı ürün grup kodu
+        brandId:
+          type: string
+          description: Marka ID'si (zorunlu)
+        categoryId:
+          type: string
+          description: Kategori ID'si (zorunlu)
+        quantity:
+          type: integer
+          description: Stok miktarı
+          minimum: 0
+        stockCode:
+          type: string
+          description: Stok kodu
+        dimensionalWeight:
+          type: number
+          format: double
+          description: Hacimsel ağırlık
+        description:
+          type: string
+          description: Ürün açıklaması
+        currencyType:
+          type: string
+          description: Para birimi tipi
+          example: "TRY"
+        listPrice:
+          type: number
+          format: double
+          description: Liste fiyatı
+          minimum: 0
+        salePrice:
+          type: number
+          format: double
+          description: Satış fiyatı
+          minimum: 0
+        vatRate:
+          type: integer
+          description: KDV oranı (%)
+          enum: [0, 1, 8, 18]
+        deliveryDuration:
+          type: integer
+          description: Teslimat süresi (gün)
+          minimum: 1
+        shipmentAddressId:
+          type: string
+          description: Gönderi adres ID'si
+        returningAddressId:
+          type: string
+          description: İade adres ID'si
+        color:
+          type: string
+          description: Renk
+        size:
+          type: string
+          description: Beden
+        gender:
+          type: string
+          description: Cinsiyet
+          enum: [Erkek, Kadın, Unisex]
+        origin:
+          type: string
+          description: Menşei
+        minOrderQuantity:
+          type: integer
+          description: Minimum sipariş miktarı
+          minimum: 1
+        maxOrderQuantity:
+          type: integer
+          description: Maksimum sipariş miktarı
+          minimum: 1
+        unit:
+          type: string
+          description: Birim
+        numberContentUnits:
+          type: number
+          format: double
+          description: İçerik birim sayısı
+        deliveryOption:
+          $ref: '#/components/schemas/DeliveryOptionDTO'
+        images:
+          type: array
+          description: Ürün görselleri
+          items:
+            $ref: '#/components/schemas/ImageDTO'
+        attributes:
+          type: array
+          description: Ürün özellikleri
+          items:
+            $ref: '#/components/schemas/ProductAttributeDTO'
+
+    ImageDTO:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Görsel URL'i
+
+    ProductAttributeDTO:
+      type: object
+      properties:
+        attributeId:
+          type: integer
+          format: int64
+          description: Özellik ID
+        attributeValueId:
+          type: integer
+          format: int64
+          description: Özellik Değer ID
+        customAttributeValue:
+          type: string
+          description: Özel Özellik Değeri
+
+    ArchivedProductRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: Arşivlenecek ürünler listesi
+          items:
+            $ref: '#/components/schemas/ArchivedProductItem'
+
+    ArchivedProductItem:
+      type: object
+      properties:
+        barcode:
+          type: string
+          description: Ürün barkodu
+        archived:
+          type: boolean
+          description: Arşivlensin mi?
+
+    BatchRequestResponse:
+      type: object
+      properties:
+        batchRequestId:
+          type: string
+          format: uuid
+          description: Toplu işlem ID'si
+          example: "9f287223-de66-42d6-b0b6-f374d6670a83"
+
+    BatchRequestResultResponse:
+      type: object
+      properties:
+        batchRequestId:
+          type: string
+          format: uuid
+          description: Toplu işlem ID'si
+        status:
+          type: string
+          description: İşlem durumu
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+        creationDate:
+          type: integer
+          format: int64
+          description: Oluşturulma tarihi
+        lastModificationDate:
+          type: integer
+          format: int64
+          description: Son değişiklik tarihi
+        sourceType:
+          type: string
+          description: Kaynak tipi
+        itemCount:
+          type: integer
+          description: Toplam kayıt sayısı
+        failedItemCount:
+          type: integer
+          description: Başarısız kayıt sayısı
+        batchRequestType:
+          type: string
+          description: Toplu işlem tipi
+        items:
+          type: array
+          description: İşlem kalemleri
+          items:
+            $ref: '#/components/schemas/BatchRequestItemDTO'
+
+    BatchRequestItemDTO:
+      type: object
+      properties:
+        barcode:
+          type: string
+          description: Barkod
+        status:
+          type: string
+          description: Durum
+        failureReasons:
+          type: array
+          description: Hata nedenleri
+          items:
+            type: string
+
+    ProductFilterResponse:
+      type: object
+      properties:
+        totalElements:
+          type: integer
+          description: Toplam kayıt sayısı
+        totalPages:
+          type: integer
+          description: Toplam sayfa sayısı
+        page:
+          type: integer
+          description: Mevcut sayfa numarası
+        size:
+          type: integer
+          description: Sayfa başına kayıt sayısı
+        content:
+          type: array
+          description: Ürün listesi
+          items:
+            $ref: '#/components/schemas/ProductFilterItemDTO'
+
+    ProductFilterItemDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Ürün ID'si
+        barcode:
+          type: string
+          description: Barkod
+        productCode:
+          type: string
+          description: Ürün kodu
+        title:
+          type: string
+          description: Ürün başlığı
+        description:
+          type: string
+          description: Ürün açıklaması
+        stockCode:
+          type: string
+          description: Stok kodu
+        productUrl:
+          type: string
+          description: Ürün URL'i
+        brand:
+          type: string
+          description: Marka adı
+        brandId:
+          type: string
+          description: Marka ID'si
+        categoryName:
+          type: string
+          description: Kategori adı
+        quantity:
+          type: integer
+          description: Stok miktarı
+        salePrice:
+          type: number
+          format: double
+          description: Satış fiyatı
+        listPrice:
+          type: number
+          format: double
+          description: Liste fiyatı
+        approved:
+          type: boolean
+          description: Onaylandı mı?
+        onsale:
+          type: boolean
+          description: Satışta mı?
+        archived:
+          type: boolean
+          description: Arşivlendi mi?
+        locked:
+          type: boolean
+          description: Kilitli mi?
+        lockedByUnSuppliedReason:
+          type: boolean
+          description: Tedarik edilememe nedeniyle kilitli mi?
+        productMainId:
+          type: string
+          description: Varyantlı ürün grup kodu
+        createDateTime:
+          type: integer
+          format: int64
+          description: Oluşturulma tarihi (Unix timestamp)
+        lastUpdateDate:
+          type: integer
+          format: int64
+          description: Son güncelleme tarihi (Unix timestamp)
+        gender:
+          type: string
+          description: Cinsiyet
+        stockUnitType:
+          type: string
+          description: Stok birim tipi
+        dimensionalWeight:
+          type: number
+          format: double
+          description: Hacimsel ağırlık
+        vatRate:
+          type: integer
+          description: KDV oranı
+        color:
+          type: string
+          description: Renk
+        size:
+          type: string
+          description: Beden
+        images:
+          type: array
+          description: Ürün görselleri
+          items:
+            $ref: '#/components/schemas/ImageDTO'
+        attributes:
+          type: array
+          description: Ürün özellikleri
+          items:
+            $ref: '#/components/schemas/ProductAttributeDTO'
+        deliveryOption:
+          $ref: '#/components/schemas/DeliveryOptionDTO'
+        origin:
+          type: string
+          description: Menşei
+        numberContentUnits:
+          type: number
+          format: double
+          description: Koli içi adet
+        deliveryDuration:
+          type: integer
+          description: Teslimat süresi (gün)
+        returnAddress:
+          $ref: '#/components/schemas/BasicAddressDTO'
+        shipmentAddress:
+          $ref: '#/components/schemas/BasicAddressDTO'
+
+    BasicAddressDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Adres ID
+        addressTitle:
+          type: string
+          description: Adres başlığı
+
+
+
+    # ==================== VENDOR SCHEMAS ====================
+    CargoProviderListDTO:
+      type: object
+      properties:
+        cargoProviders:
+          type: array
+          description: Kargo firmaları listesi
+          items:
+            $ref: '#/components/schemas/CargoProviderItemDTO'
+
+    CargoProviderItemDTO:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Kargo firma kodu
+          example: "horoz"
+        name:
+          type: string
+          description: Kargo firma adı
+          example: "Horoz Kargo"
+
+    VendorCargoPriorityUpdateRequest:
+      type: object
+      properties:
+        bigScaleDeliveryList:
+          type: array
+          description: Büyük ölçekli teslimat için kargo firma kodları sırası
+          items:
+            type: string
+          example: ["horoz", "ptt", "ups", "kolay-gelsin", "kuryenet", "yurtici"]
+        standardScaleDeliveryList:
+          type: array
+          description: Standart ölçekli teslimat için kargo firma kodları sırası
+          items:
+            type: string
+          example: ["ptt", "ups", "horoz", "kolay-gelsin", "kuryenet", "yurtici"]
+
+    DeliveryOptionDTO:
+      type: object
+      properties:
+        deliveryDuration:
+          type: integer
+          description: Teslimat süresi (gün)
+          minimum: 1
+        fastDeliveryType:
+          type: string
+          description: Hızlı teslimat tipi
+          example: "SAME_DAY"
+
+    OriginDTO:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Ülke kodu
+          example: "TR"
+        name:
+          type: string
+          description: Ülke adı
+          example: "Türkiye"
+
+    OriginsResponse:
+      type: object
+      properties:
+        origins:
+          type: array
+          description: Menşei listesi
+          items:
+            $ref: '#/components/schemas/OriginDTO'
+        page:
+          type: integer
+          description: Mevcut sayfa numarası
+        size:
+          type: integer
+          description: Sayfa başına kayıt sayısı
+        totalElements:
+          type: integer
+          description: Toplam kayıt sayısı
+        totalPages:
+          type: integer
+          description: Toplam sayfa sayısı
+
+tags:
+  - name: Sipariş Entegrasyonu
+    description: Sipariş yönetimi servisleri
+  - name: Ürün Entegrasyonu
+    description: Ürün yönetimi servisleri
+  - name: Satıcı Entegrasyonu
+    description: Satıcı yönetimi servisleri
